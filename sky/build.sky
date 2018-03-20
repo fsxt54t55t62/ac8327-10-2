@@ -1,0 +1,11 @@
+#!/bin/sh
+echo "use sky board"
+#default off
+
+#################7601##################
+export SUPPORT_MT7601=1
+
+if [ $SUPPORT_MT7601 -eq 1 ]; then
+find ./build/tools/sky/mt7601/ -type f | xargs touch
+	cp -ruaf ./build/tools/sky/mt7601/*          ./
+fi

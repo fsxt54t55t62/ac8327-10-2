@@ -1,0 +1,389 @@
+# ATC platform .rc configure
+
+#import init.project.rc
+/*AEE Feature.	*/
+/*@09/02/2016 Added by Joshua Wang*/
+import init.aee.rc
+
+
+
+on early-init
+    mount debugfs debugfs /sys/kernel/debug
+    chmod 0755 /sys/kernel/debug
+
+on init
+    # Support legacy paths
+    symlink /sdcard /mnt/sdcard
+# move from init.rc to fix init error. --barton 17-03-15
+    write /sys/fs/cgroup/memory/memory.move_charge_at_immigrate 1
+    write /sys/fs/cgroup/memory/sw/memory.swappiness 100
+    write /sys/fs/cgroup/memory/sw/memory.move_charge_at_immigrate 1
+    write /proc/cpu/alignment 4
+
+on fs
+    mkdir /adas 0770 system system
+    mkdir /mnt/media_rw/internal_sdcard 0777 root root
+    mount_all fstab.ac83xx
+	setprop wifi.interface wlan0
+	setprop wifi.ap.interface wlan0
+	mkdir /data/misc/wifi 0770 wifi wifi
+	mkdir /data/misc/wifi/sockets 0770 wifi wifi
+	mkdir /data/misc/dhcp 0770 dhcp dhcp
+	#setprop wlan.vendor "mt7601"
+
+on post-fs
+    insmod /system/drivers/pwm.ko
+    insmod /system/drivers/atc_bl.ko
+    insmod /system/drivers/imgresz.ko
+    insmod /system/drivers/irtdma.ko
+    insmod /system/drivers/gfx.ko
+    insmod /system/drivers/vcp.ko
+    insmod /system/drivers/atcfb.ko COLOR_DEPTH_32_BIT=1
+    insmod /system/drivers/fb1.ko
+    insmod /system/drivers/dualarmdrv.ko
+    insmod /system/drivers/backcar.ko
+    insmod /system/drivers/drvstc.ko
+    insmod /system/drivers/adec.ko
+    insmod /system/drivers/wch.ko
+    insmod /system/drivers/tvd.ko
+    insmod /system/drivers/drvmmisc.ko
+    insmod /system/drivers/drvdmx.ko
+    insmod /system/drivers/vdec.ko
+    insmod /system/drivers/mhldrv.ko
+    insmod /system/drivers/videobuf-core.ko
+    insmod /system/drivers/videobuf2-core.ko
+    insmod /system/drivers/videobuf2-memops.ko
+    insmod /system/drivers/videobuf2-vmalloc.ko
+    insmod /system/drivers/videobuf2-dma-contig.ko
+    insmod /system/drivers/videobuf-dma-contig.ko
+    insmod /system/drivers/avin.ko
+    insmod /system/drivers/imgcommon.ko
+    insmod /system/drivers/jdec.ko
+    insmod /system/drivers/mtz_drv.ko
+    insmod /system/drivers/pdec.ko
+    insmod /system/drivers/gdec.ko
+    insmod /system/drivers/ump.ko
+    insmod /system/drivers/mali.ko
+    insmod /system/drivers/sonix_uvcvideo.ko
+    insmod /system/drivers/mt7601Usta.ko
+    insmod /system/drivers/musb_hdrc.ko
+    insmod /system/drivers/g_android.ko
+    insmod /system/drivers/musbh_hdrc.ko
+
+	
+    chmod 0666 /dev/atc_dvp
+    chown system graphics /dev/ump
+    chmod 0666 /dev/ump
+    chown system graphics /dev/mali
+    chmod 0666 /dev/mali
+    chmod 0666 /sys/atc2ctl/mode
+    restorecon /sys/atc2ctl/mode
+    chmod 0666 /sys/atc2ctl/power
+    chmod 0666 /sys/atc2hcd/power
+    chmod 0666 /sys/kernel/debug/musb/testmode
+    chmod 0666 /sys/kernel/debug/h_musb/h_testmode
+#add for SPOH apk
+    chmod 0666 /dev/power_loss_test
+    chmod 0666 /dev/misc-sd
+
+    chown system system /sys/boot/state
+    chmod 0664 /sys/boot/state
+    chown system system /sys/atc_ate/trigger
+    chmod 0664 /sys/atc_ate/trigger
+
+	chmod 0755 /system/bin/adb-ec-server.sh
+	chmod 0777 /system/bin/copyWifiConf.sh
+on property:init.svc.bootanim=stopped
+start atc_ipod_core
+
+on property:sys.suspend.state=1
+write /sys/boot/state "resume_end"
+
+on property:sys.suspend.state=2
+write /sys/boot/state "suspend_start"
+
+service atc_ipod_core /system/bin/atc_ipod_core
+    disabled
+    user system
+    group system
+
+#setProperty when boot Just for test
+service bootByChip system/bin/bootByChip
+    class main
+    oneshot
+
+####wifi control start
+service wmt_loader /system/bin/wmt_loader
+    class main
+    disabled
+    oneshot
+
+service 6620_launcher /system/bin/6620_launcher -m 4 -p /system/etc/firmware
+    class main
+    disabled
+    oneshot
+
+service stp_dump /system/bin/stp_dump3
+    class main
+    disabled
+    oneshot
+
+
+#service autokd /system/bin/autokd
+#    class late-start
+#    oneshot
+ #on CHIP_ID_MT6630
+#on property:ro.dynamic.chipID=CHIP_ID_MT6630
+#wifi boot control
+#   insmod /system/drivers/gps_6630.ko
+#   insmod /system/drivers/mtk_wmt_detect.ko
+#   start wmt_loader
+#   start 6620_launcher
+#   start stp_dump
+#gps boot control
+#   mkdir /data/gps_mnl 0771 gps system
+#   start mnld
+
+#on property:ro.dynamic.btID=BT_ID_6622
+#   insmod /system/drivers/btdrv.ko
+
+#on property:ro.dynamic.wifiID=WIFI_ID_7601
+#   insmod /syste/drivers/wlan.ko
+
+
+service p2p_supplicant /system/bin/wpa_supplicant \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/p2p_supplicant_7601.conf \
+	-O/data/misc/wifi/sockets \
+	-e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0 \
+	-puse_p2p_group_interface=1p2p_device=1
+    #   we will start as root and wpa_supplicant will switch to user wifi
+    #   after setting up the capabilities required for WEXT
+    #   user wifi
+    #   group wifi inet keystore
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service wpa_supplicant /system/bin/wpa_supplicant \
+    -iwlan0 -Dnl80211 -c/data/misc/wifi/wpa_supplicant_7601.conf \
+	-O/data/misc/wifi/sockets \
+	-e/data/misc/wifi/entropy.bin -g@android:wpa_wlan0
+    #   we will start as root and wpa_supplicant will switch to user wifi
+    #   after setting up the capabilities required for WEXT
+    #   user wifi
+    #   group wifi inet keystore
+    class main
+    socket wpa_wlan0 dgram 660 wifi wifi
+    disabled
+    oneshot
+
+service dhcpcd_bt-pan /system/bin/dhcpcd -BK -dd
+    class main
+    user root
+    group net_admin net_raw
+    disabled
+    oneshot
+
+service dhcpcd_wlan0 /system/bin/dhcpcd -BK -dd
+    class main
+    user root
+    group net_admin net_raw
+    disabled
+    oneshot
+
+service dhcpcd_p2p /system/bin/dhcpcd -BK -dd
+    class main
+    user root
+    group net_admin net_raw
+    disabled
+    oneshot
+
+service iprenew_wlan0 /system/bin/dhcpcd -n
+    class main
+    user dhcp
+    group net_admin net_raw
+    disabled
+    oneshot
+
+service iprenew_p2p /system/bin/dhcpcd -n
+    class main
+    user dhcp
+    group net_admin net_raw
+    disabled
+    oneshot
+
+service dhcp_inform /system/bin/dhcpcd -s -BK -A
+    class main
+    user root
+    group system radio dhcp net_admin net_raw
+    disabled
+    oneshot
+
+service dhcpv6_inform /system/bin/dhcp6c -c "/etc/wide-dhcpv6/dhcp6cSIP.conf" -Dfi
+    class main
+    user root
+    group system radio dhcp net_admin net_raw
+    disabled
+    oneshot
+
+service dhcp6cDNS_wlan0 /system/bin/dhcp6c -c "/etc/wide-dhcpv6/dhcp6cDNS.conf" -Df wlan0
+    disabled
+    oneshot
+
+service dhcp6c_wlan0 /system/bin/dhcp6c -c "/etc/wide-dhcpv6/dhcp6c.conf" -Df wlan0
+    disabled
+    oneshot
+
+on property:service.dhcp6c_wlan0.enable=0
+    stop dhcp6c_wlan0
+
+on property:service.dhcp6c_wlan0.enable=1
+    start dhcp6c_wlan0
+
+service dhcp6c_PD /system/bin/dhcp6c -c "/etc/wide-dhcpv6/dhcp6cPD.conf" -Df
+    disabled
+    oneshot
+
+service pppoe_wlan0 /system/bin/launchpppoe
+    user root
+    group radio cache inet misc
+    disabled
+    oneshot
+
+on property:service.pppoe_wlan0.enable=0
+    stop pppoe_wlan0
+
+on property:service.pppoe_wlan0.enable=1
+    start pppoe_wlan0
+####wifi control end
+
+
+# GPS
+on post-fs-data
+
+    mkdir /data/gps_mnl 0771 gps system
+    mkdir /data/misc/gps 0770 gps system
+# AGPS
+    mkdir /data/agps_supl 0771 gps system
+#Permissions for GPS Daemon
+    chmod 0660 /dev/gps
+    chown gps system /dev/gps
+#create directory /data/subt for subtitle
+    mkdir /mnt/subt/ 0770 media media
+# We chown/chmod /adas again so because mount is run as root + defaults
+    chown system system /adas
+    chmod 0770 /adas
+
+# We chown/chmod /mnt/media_rw/internal_sdcard so because mount is run as root + defaults
+    chmod 0777 /mnt/media_rw/internal_sdcard
+    
+#audio whitelist
+    mkdir /data/misc/audio 0777 system system
+#audio whitelist end
+
+#add hdmihdcp
+#    chmod 4777 /system/bin/hdmihdcp
+
+#GPS end
+
+# 3G dongle
+#ril-daemon (begin)
+service ril-3gddaemon /system/bin/rild_dongle
+    class main
+    socket rild-dongle stream 660 root radio
+    socket rild-dongle-debug stream 660 radio radio
+    user root
+    group radio cache inet misc audio log
+    disabled
+#ril-daemon (end)
+
+on property:init.svc.bootanim=stopped
+start usbdongled
+#usbdongled(begin)
+service usbdongled /system/bin/dongled
+    class main
+    user root
+    group radio cache inet misc
+    disabled
+#usbdongled(end)
+
+# 3G dongle end
+
+#driver late insmod
+on property:atc.drv.lateinsmod=1
+    insmod /system/drivers/gt9xx.ko
+    insmod /system/drivers/i2c-dev.ko
+    insmod /system/drivers/dvpagent.ko
+    insmod /system/drivers/drvcli.ko
+    insmod /system/drivers/input.ko
+
+#for hilink dongle
+service dhcpcd_eth0 /system/bin/dhcpcd -BK -dd
+    class main
+    user root
+    group net_admin net_raw
+    disabled
+    oneshot
+
+service iprenew_eth0 /system/bin/dhcpcd -n
+    class main
+    user dhcp
+    group net_admin net_raw
+    disabled
+    oneshot
+
+service hdmihdcp /system/bin/hdmihdcp                                      
+    class late_start
+    user root
+    oneshot
+# add hdmihdcp end  
+
+
+# Added by Joshua Wang @11/11/2016.
+# So good days.
+# For MTKLogger.
+service mobile_log_d /system/bin/mobile_log_d
+    class main
+# MTK PR_DEBUG SWITCH
+on property:debug.MB.prdebug=1
+    write /sys/kernel/debug/dynamic_debug/control "file *mediatek* +p"
+    write /sys/kernel/debug/dynamic_debug/control "file *gpu* -p"
+on property:debug.MB.prdebug=0
+    write /sys/kernel/debug/dynamic_debug/control "file *mediatek* -p"
+
+on property:init.svc.bootanim=stopped
+start netdiag   
+
+service netdiag /system/bin/netdiag
+    class main
+    disabled
+
+#add for metazone/logo socket by 2016/11/30  
+service metalogo /system/bin/metalogoserver
+    class main
+    socket metalogosocket stream 666 system system
+    oneshot
+
+service copyWifiConf /system/bin/sh /system/bin/copyWifiConf.sh
+	class main
+	user root
+    oneshot
+	seclabel u:r:copyWifiConf:s0
+
+service adbec /system/bin/adb-ec-server.sh
+	class core
+	disabled
+	oneshot
+	seclabel u:r:adbec:s0
+
+on property:service.adbec.enable=1
+	start adbec
+	
+on property:sys.boot_completed=1
+	mkdir /data/.android 0777 system system
+	export HOME /data
+	setprop service.adbec.enable 1
+	start copyWifiConf
+	chmod 0666 /data/misc/wifi/wpa_supplicant_7601.conf
+	chmod 0666 /data/misc/wifi/p2p_supplicant_7601.conf
